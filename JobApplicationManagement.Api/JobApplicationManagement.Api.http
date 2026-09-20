@@ -1,0 +1,26 @@
+@JobApplicationManagement.Api_HostAddress = http://localhost:5223
+
+GET {{JobApplicationManagement.Api_HostAddress}}/api/jobs
+Accept: application/json
+
+###
+
+POST {{JobApplicationManagement.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Candidate Example",
+  "email": "candidate@example.com",
+  "password": "CandidatePassword!2026",
+  "role": "Candidate"
+}
+
+###
+
+POST {{JobApplicationManagement.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "candidate@example.com",
+  "password": "CandidatePassword!2026"
+}
