@@ -19,14 +19,23 @@ public sealed class JobsController(ISender sender) : ControllerBase
 {
     [HttpGet]
     [AllowAnonymous]
+    /// <summary>Gets all open jobs available for applications.</summary>
+    [ProducesResponseType(typeof(IReadOnlyList<JobDto>), StatusCodes.Status200OK)]
     public Task<IReadOnlyList<JobDto>> Get(CancellationToken cancellationToken) => sender.Send(new GetJobsQuery(), cancellationToken);
 
     [HttpGet("{id:guid}")]
     [AllowAnonymous]
+    /// <summary>Gets an open job by its identifier.</summary>
+    [ProducesResponseType(typeof(JobDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public Task<JobDto> GetById(Guid id, CancellationToken cancellationToken) => sender.Send(new GetJobByIdQuery(id), cancellationToken);
 
     [HttpPost]
     [Authorize(Roles = Roles.Recruiter)]
+    /// <summary>Creates a new job for the current recruiter.</summary>
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Create(CreateJobCommand command, CancellationToken cancellationToken)
     {
         var id = await sender.Send(command, cancellationToken);
@@ -35,6 +44,13 @@ public sealed class JobsController(ISender sender) : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = Roles.Recruiter)]
+    /// <summary>Updates a job owned by the current recruiter.</summary>
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(Guid id, UpdateJobRequest request, CancellationToken cancellationToken)
     {
         await sender.Send(new UpdateJobCommand(id, request.Title, request.Description, request.Location, request.SalaryMin, request.SalaryMax), cancellationToken);
@@ -65,6 +81,12 @@ public sealed class JobsController(ISender sender) : ControllerBase
 
     [HttpPost("{jobId:guid}/applications")]
     [Authorize(Roles = Roles.Candidate)]
+    /// <summary>Submits an application for an open job as the current candidate.</summary>
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Apply(Guid jobId, ApplyForJobRequest request, CancellationToken cancellationToken)
     {
         var id = await sender.Send(new ApplyForJobCommand(jobId, request.CoverLetter, request.ResumeUrl), cancellationToken);
@@ -73,6 +95,11 @@ public sealed class JobsController(ISender sender) : ControllerBase
 
     [HttpGet("{jobId:guid}/applications")]
     [Authorize(Roles = Roles.Recruiter)]
+    /// <summary>Gets applications for a job owned by the current recruiter.</summary>
+    [ProducesResponseType(typeof(IReadOnlyList<JobApplicationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public Task<IReadOnlyList<JobApplicationDto>> GetApplications(Guid jobId, CancellationToken cancellationToken) =>
         sender.Send(new GetJobApplicationsQuery(jobId), cancellationToken);
 }

@@ -14,6 +14,8 @@ namespace JobApplicationManagement.Api.Controllers;
 public sealed class AuthController(UserManager<ApplicationUser> userManager, JwtTokenService tokenService) : ControllerBase
 {
     [HttpPost("register")]
+    /// <summary>Registers a Candidate or Recruiter and returns a JWT access token.</summary>
+    /// <remarks>The email must be unique and the requested role must be supported by the application.</remarks>
     [ProducesResponseType(typeof(AccessTokenResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -39,6 +41,7 @@ public sealed class AuthController(UserManager<ApplicationUser> userManager, Jwt
     }
 
     [HttpPost("login")]
+    /// <summary>Authenticates a user and returns a JWT access token.</summary>
     [ProducesResponseType(typeof(AccessTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<AccessTokenResponse>> Login(LoginRequest request)
