@@ -41,8 +41,22 @@ public sealed class JobsController(ISender sender) : ControllerBase
         return NoContent();
     }
 
-    [HttpPatch("{id:guid}/close")]
+    /// <summary>Closes a job owned by the current recruiter.</summary>
+    /// <remarks>A closed job cannot accept new applications and cannot be closed again.</remarks>
+    /// <param name="id">The identifier of the job to close.</param>
+    /// <param name="cancellationToken">The request cancellation token.</param>
+    /// <response code="204">The job was closed successfully.</response>
+    /// <response code="401">The caller is not authenticated.</response>
+    /// <response code="403">The current recruiter does not own the job.</response>
+    /// <response code="404">The job does not exist.</response>
+    /// <response code="409">The job is already closed.</response>
+    [HttpPut("{id:guid}/close")]
     [Authorize(Roles = Roles.Recruiter)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Close(Guid id, CancellationToken cancellationToken)
     {
         await sender.Send(new CloseJobCommand(id), cancellationToken);
