@@ -10,4 +10,9 @@ public sealed class JobRepository(ApplicationDbContext context) : IJobRepository
 
     public Task<Job?> GetByIdAsync(Guid jobId, CancellationToken cancellationToken) =>
         context.Jobs.SingleOrDefaultAsync(job => job.Id == jobId, cancellationToken);
+
+    public async Task<IReadOnlyList<Job>> GetOpenCreatedBeforeAsync(DateTime cutoffUtc, CancellationToken cancellationToken) =>
+        await context.Jobs
+            .Where(job => job.IsActive && job.CreatedAt < cutoffUtc)
+            .ToListAsync(cancellationToken);
 }

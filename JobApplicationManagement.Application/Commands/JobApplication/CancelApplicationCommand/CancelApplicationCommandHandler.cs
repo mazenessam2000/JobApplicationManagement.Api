@@ -6,7 +6,11 @@ using MediatR;
 
 namespace JobApplicationManagement.Application.Commands.JobApplication.CancelApplicationCommand;
 
-public sealed class CancelApplicationCommandHandler(IJobApplicationRepository applications, IUnitOfWork unitOfWork, ICurrentUserService currentUser) : IRequestHandler<CancelApplicationCommand>
+public sealed class CancelApplicationCommandHandler(
+    IJobApplicationRepository applications,
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUser,
+    IBackgroundJobScheduler backgroundJobs) : IRequestHandler<CancelApplicationCommand>
 {
     public async Task Handle(CancelApplicationCommand request, CancellationToken cancellationToken)
     {
@@ -16,5 +20,6 @@ public sealed class CancelApplicationCommandHandler(IJobApplicationRepository ap
             throw new BusinessRuleException("A finalised application cannot be cancelled.");
         applications.Remove(application);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        backgroundJobs.EnqueueCandidateCancellationNotification(application.Id);
     }
 }

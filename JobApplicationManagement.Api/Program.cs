@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using JobApplicationManagement.Api.Authentication;
+using JobApplicationManagement.Api.Infrastructure;
 using JobApplicationManagement.Application.Behaviors;
 using JobApplicationManagement.Application.Exceptions;
 using JobApplicationManagement.Application.Persistence;
@@ -13,6 +14,8 @@ using JobApplicationManagement.Infrastructure.Persistence.Queries;
 using JobApplicationManagement.Infrastructure.Persistence.Repositories;
 using JobApplicationManagement.Infrastructure.Services;
 using MediatR;
+using Hangfire;
+using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
@@ -39,16 +42,6 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT"
     });
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            Array.Empty<string>()
-        }
-    });
 });
 builder.Services.AddHttpContextAccessor();
 
@@ -56,6 +49,10 @@ builder.Services.AddOptions<JwtOptions>()
     .BindConfiguration(JwtOptions.SectionName)
     .ValidateDataAnnotations()
     .Validate(options => Encoding.UTF8.GetByteCount(options.Key) >= 32, "JWT signing key must be at least 32 bytes.")
+    .ValidateOnStart();
+builder.Services.AddOptions<JobLifecycleOptions>()
+    .BindConfiguration(JobLifecycleOptions.SectionName)
+    .ValidateDataAnnotations()
     .ValidateOnStart();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -66,6 +63,20 @@ builder.Services.AddScoped<IJobQueries, JobQueries>();
 builder.Services.AddScoped<IJobApplicationQueries, JobApplicationQueries>();
 builder.Services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ApplicationDbContext>());
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<INotificationService, LoggingNotificationService>();
+builder.Services.AddScoped<IJobLifecycleMaintenanceService, JobLifecycleMaintenanceService>();
+builder.Services.AddScoped<IBackgroundJobScheduler, HangfireBackgroundJobScheduler>();
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("The DefaultConnection connection string is not configured.");
+builder.Services.AddHangfire(configuration => configuration
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
+    {
+        PrepareSchemaIfNecessary = true
+    }));
+builder.Services.AddHangfireServer();
 
 builder.Services.AddIdentityCore<ApplicationUser>()
     .AddRoles<IdentityRole<Guid>>()
@@ -127,9 +138,19 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = [new LocalDashboardAuthorizationFilter()]
+    });
 }
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+RecurringJob.AddOrUpdate<IJobLifecycleMaintenanceService>(
+    "close-expired-jobs",
+    service => service.CloseExpiredJobsAsync(CancellationToken.None),
+    // Runs daily at 00:00 UTC. Hangfire persists this recurring-job definition in SQL Server.
+    Cron.Daily());
 app.Run();
